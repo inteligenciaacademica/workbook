@@ -1,32 +1,58 @@
-# Adicione a referência à assembly do DocumentFormat.OpenXml
-Add-Type -AssemblyName DocumentFormat.OpenXml
+# Importar o módulo SQLServer se necessário
+if (-not (Get-Module -Name SqlServer)) {
+    Install-Module -Name SqlServer -Scope CurrentUser -Force -AllowClobber
+}
 
-# Defina o caminho do arquivo Excel a ser criado
+# Importar o módulo SqlServer
+Import-Module -Name SqlServer
+
+# Definir informações de conexão com o banco de dados
+$serverName = "nome_servidor"
+$databaseName = "nome_banco_dados"
+$tableName = "nome_tabela"
 $filePath = "C:\caminho\para\seu\arquivo.xlsx"
 
-# Crie um novo documento Excel
+# Definir a consulta SQL para extrair os dados da tabela
+$query = "SELECT * FROM $tableName"
+
+# Conectar ao banco de dados SQL Server
+$sqlConnection = New-SqlConnection -ServerInstance $serverName -Database $databaseName
+$sqlConnection.Open()
+
+# Executar a consulta SQL
+$sqlCommand = $sqlConnection.CreateCommand()
+$sqlCommand.CommandText = $query
+$reader = $sqlCommand.ExecuteReader()
+
+# Criar um arquivo Excel
 $spreadsheetDocument = [DocumentFormat.OpenXml.Packaging.SpreadsheetDocument]::Create($filePath, [DocumentFormat.OpenXml.SpreadsheetDocumentType]::Workbook)
-
-# Adicione uma planilha ao documento
-$workbookPart = $spreadsheetDocument.AddWorkbookPart()
-$workbookPart.Workbook = New-Object DocumentFormat.OpenXml.Spreadsheet.Workbook
-
-# Adicione uma planilha ao workbook
-$worksheetPart = $workbookPart.AddNewPart([DocumentFormat.OpenXml.Packaging.WorksheetPart]::typeid, "rId1")
+$workbookPart = $spreadsheetDocument.WorkbookPart
+$worksheetPart = $workbookPart.AddNewPart([DocumentFormat.OpenXml.Packaging.WorksheetPart]::typeid)
 $worksheetPart.Worksheet = New-Object DocumentFormat.OpenXml.Spreadsheet.Worksheet
 $sheetData = New-Object DocumentFormat.OpenXml.Spreadsheet.SheetData
 $worksheetPart.Worksheet.AppendChild($sheetData)
 
-# Crie uma linha na planilha
-$row = New-Object DocumentFormat.OpenXml.Spreadsheet.Row
-$cell = New-Object DocumentFormat.OpenXml.Spreadsheet.Cell
-$cell.DataType = [DocumentFormat.OpenXml.Spreadsheet.CellValues]::String
-$cell.CellValue = New-Object DocumentFormat.OpenXml.Spreadsheet.CellValue("Hello, World!")
-$row.AppendChild($cell)
-$sheetData.AppendChild($row)
+# Ler os dados do SQL e escrevê-los no arquivo Excel
+$rowIndex = 1
+while ($reader.Read()) {
+    $row = New-Object DocumentFormat.OpenXml.Spreadsheet.Row
 
-# Salve e feche o documento
+    for ($i = 0; $i -lt $reader.FieldCount; $i++) {
+        $cell = New-Object DocumentFormat.OpenXml.Spreadsheet.Cell
+        $cell.DataType = [DocumentFormat.OpenXml.Spreadsheet.CellValues]::String
+        $cell.CellValue = New-Object DocumentFormat.OpenXml.Spreadsheet.CellValue($reader.GetValue($i).ToString())
+        $row.AppendChild($cell)
+    }
+
+    $sheetData.AppendChild($row)
+    $rowIndex++
+}
+
+# Salvar e fechar o documento
 $workbookPart.Workbook.Save()
 $spreadsheetDocument.Close()
+
+# Fechar a conexão com o banco de dados
+$sqlConnection.Close()
 
 Write-Host "O arquivo Excel foi criado com sucesso em: $filePath"
