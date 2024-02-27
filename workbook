@@ -19,10 +19,13 @@ $query = "SELECT * FROM $tableName"
 $sqlConnection = New-SqlConnection -ServerInstance $serverName -Database $databaseName
 $sqlConnection.Open()
 
-# Executar a consulta SQL
-$sqlCommand = $sqlConnection.CreateCommand()
-$sqlCommand.CommandText = $query
-$reader = $sqlCommand.ExecuteReader()
+# Executar a consulta SQL e carregar os resultados em um DataSet
+$adapter = New-Object System.Data.SqlClient.SqlDataAdapter ($query, $sqlConnection)
+$dataSet = New-Object System.Data.DataSet
+$adapter.Fill($dataSet) | Out-Null
+
+# Fechar a conexão com o banco de dados
+$sqlConnection.Close()
 
 # Criar um arquivo Excel
 $spreadsheetDocument = [DocumentFormat.OpenXml.Packaging.SpreadsheetDocument]::Create($filePath, [DocumentFormat.OpenXml.SpreadsheetDocumentType]::Workbook)
@@ -32,27 +35,26 @@ $worksheetPart.Worksheet = New-Object DocumentFormat.OpenXml.Spreadsheet.Workshe
 $sheetData = New-Object DocumentFormat.OpenXml.Spreadsheet.SheetData
 $worksheetPart.Worksheet.AppendChild($sheetData)
 
-# Ler os dados do SQL e escrevê-los no arquivo Excel
+# Escrever os dados do DataSet no arquivo Excel
 $rowIndex = 1
-while ($reader.Read()) {
-    $row = New-Object DocumentFormat.OpenXml.Spreadsheet.Row
+foreach ($table in $dataSet.Tables) {
+    foreach ($row in $table.Rows) {
+        $excelRow = New-Object DocumentFormat.OpenXml.Spreadsheet.Row
 
-    for ($i = 0; $i -lt $reader.FieldCount; $i++) {
-        $cell = New-Object DocumentFormat.OpenXml.Spreadsheet.Cell
-        $cell.DataType = [DocumentFormat.OpenXml.Spreadsheet.CellValues]::String
-        $cell.CellValue = New-Object DocumentFormat.OpenXml.Spreadsheet.CellValue($reader.GetValue($i).ToString())
-        $row.AppendChild($cell)
+        foreach ($column in $table.Columns) {
+            $excelCell = New-Object DocumentFormat.OpenXml.Spreadsheet.Cell
+            $excelCell.DataType = [DocumentFormat.OpenXml.Spreadsheet.CellValues]::String
+            $excelCell.CellValue = New-Object DocumentFormat.OpenXml.Spreadsheet.CellValue($row[$column].ToString())
+            $excelRow.AppendChild($excelCell)
+        }
+
+        $sheetData.AppendChild($excelRow)
+        $rowIndex++
     }
-
-    $sheetData.AppendChild($row)
-    $rowIndex++
 }
 
 # Salvar e fechar o documento
 $workbookPart.Workbook.Save()
 $spreadsheetDocument.Close()
-
-# Fechar a conexão com o banco de dados
-$sqlConnection.Close()
 
 Write-Host "O arquivo Excel foi criado com sucesso em: $filePath"
