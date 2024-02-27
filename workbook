@@ -1,0 +1,43 @@
+# Carregando a Assembly do DocumentFormat.OpenXml
+Add-Type -AssemblyName DocumentFormat.OpenXml
+
+# Importando namespaces necessários
+using namespace DocumentFormat.OpenXml
+using namespace DocumentFormat.OpenXml.Packaging
+using namespace DocumentFormat.OpenXml.Spreadsheet
+
+# Caminho do arquivo Excel a ser criado
+$filePath = "C:\caminho\para\seu\arquivo.xlsx"
+
+# Criando um documento Excel
+$spreadsheetDocument = SpreadsheetDocument::Create($filePath, SpreadsheetDocumentType::Workbook)
+
+# Adicionando uma planilha ao documento
+$workbookPart = $spreadsheetDocument.AddWorkbookPart()
+$workbookPart.Workbook = New-Object DocumentFormat.OpenXml.Spreadsheet.Workbook
+
+$worksheetPart = $workbookPart.AddNewPart([WorksheetPart], "rId1")
+$worksheetPart.Worksheet = New-Object DocumentFormat.OpenXml.Spreadsheet.Worksheet(New-Object DocumentFormat.OpenXml.Spreadsheet.SheetData)
+
+# Adicionando dados à planilha
+$sheetData = $worksheetPart.Worksheet.GetFirstChild([SheetData])
+$row = New-Object DocumentFormat.OpenXml.Spreadsheet.Row
+
+# Adicionando células à linha
+$cell1 = New-Object DocumentFormat.OpenXml.Spreadsheet.Cell
+$cell1.CellValue = New-Object DocumentFormat.OpenXml.Spreadsheet.CellValue("Hello")
+$cell1.DataType = [DocumentFormat.OpenXml.Spreadsheet.CellValues]::String
+$row.AppendChild($cell1)
+
+$cell2 = New-Object DocumentFormat.OpenXml.Spreadsheet.Cell
+$cell2.CellValue = New-Object DocumentFormat.OpenXml.Spreadsheet.CellValue("World!")
+$cell2.DataType = [DocumentFormat.OpenXml.Spreadsheet.CellValues]::String
+$row.AppendChild($cell2)
+
+$sheetData.AppendChild($row)
+
+# Salvando e fechando o documento
+$workbookPart.Workbook.Save()
+$spreadsheetDocument.Close()
+
+Write-Host "O arquivo Excel foi criado com sucesso em: $filePath"
